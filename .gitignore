@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# 모델 가중치 (용량 큼 — 실행 시 자동 다운로드)
+*.pt
+*.pth
+*.onnx
+
+# 영상 데이터
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# 좌석 ROI (환경마다 다름)
+rois.json
+
+# 스냅샷 캐시
+snapshots/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+seat-monitoring-mockup-share/
+
+# OS
+.DS_Store
+Thumbs.db
