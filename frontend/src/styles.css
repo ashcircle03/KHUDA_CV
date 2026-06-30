@@ -477,6 +477,21 @@ button:disabled {
   border-radius: 0;
 }
 
+.table-overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.table-overlay.is-changed {
+  background: rgba(232, 163, 0, 0.14);
+}
+
 .seat-overlay.is-polygon:hover,
 .seat-overlay.is-polygon.is-selected {
   transform: none;

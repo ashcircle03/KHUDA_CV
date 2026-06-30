@@ -353,7 +353,7 @@ def _boxes_to_belongings(boxes: list[Box]) -> list[dict]:
 
 def _load_rois(path: str) -> dict[str, np.ndarray]:
     config = RoiConfig.load(path)
-    return config.pixel_polygons(config.source_width, config.source_height)
+    return config.seat_pixel_polygons(config.source_width, config.source_height)
 
 
 def _build_botsort(reid_weights: str, device: str):

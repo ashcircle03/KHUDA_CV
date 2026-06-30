@@ -22,10 +22,11 @@ def _draw_debug(
 ) -> np.ndarray:
     vis = frame.copy()
     h, w = frame.shape[:2]
-    polygons = roi_config.pixel_polygons(w, h)
+    table_polygons = roi_config.table_pixel_polygons(w, h)
+    seat_polygons = roi_config.seat_pixel_polygons(w, h)
     status_by_seat = {entry["seatId"]: entry for entry in state_engine.get_status()}
 
-    for seat_id, poly in polygons.items():
+    for seat_id, seat_poly in seat_polygons.items():
         entry = status_by_seat.get(seat_id)
         state = entry["occupancyState"] if entry else "EMPTY"
         if state == "SEATED":
@@ -34,8 +35,11 @@ def _draw_debug(
             color = (255, 150, 0)
         else:
             color = (200, 200, 200)
-        cv2.polylines(vis, [poly], True, color, 2)
-        pts = poly.reshape(-1, 2)
+        table_poly = table_polygons.get(seat_id)
+        if table_poly is not None:
+            cv2.polylines(vis, [table_poly], True, (0, 210, 255), 1)
+        cv2.polylines(vis, [seat_poly], True, color, 2)
+        pts = seat_poly.reshape(-1, 2)
         x, y = int(pts[:, 0].min()), int(pts[:, 1].min())
         score = entry.get("tableChangeScore", 0.0) if entry else 0.0
         label = f"{seat_id}: {state} {score:.3f}"

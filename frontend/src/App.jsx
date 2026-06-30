@@ -189,33 +189,45 @@ function MetricCard({ icon, label, value, tone, helper }) {
 function SeatOverlay({ seat, selected, onSelect }) {
   const meta = STATE_META[seat.state] ?? STATE_META.empty;
   const roi  = seat.roi ?? {};
-  const polygon = Array.isArray(seat.polygon) ? seat.polygon : [];
-  if (polygon.length >= 3) {
-    const clipPath = polygonToClipPath(polygon);
-    const center = polygonCentroid(polygon);
+  const seatPolygon = Array.isArray(seat.seatPolygon) && seat.seatPolygon.length >= 3
+    ? seat.seatPolygon
+    : (Array.isArray(seat.polygon) ? seat.polygon : []);
+  const tablePolygon = Array.isArray(seat.tablePolygon) ? seat.tablePolygon : [];
+  if (seatPolygon.length >= 3) {
+    const clipPath = polygonToClipPath(seatPolygon);
+    const center = polygonCentroid(seatPolygon);
     return (
-      <button
-        type="button"
-        className={`seat-overlay is-polygon tone-${meta.tone} ${selected ? "is-selected" : ""}`}
-        style={{ clipPath }}
-        onClick={() => onSelect(seat.seatId)}
-        aria-label={`${seat.seatId} ${meta.label}`}
-      >
-        <span
-          className="seat-label polygon-label"
-          style={{ left: `${center.x * 100}%`, top: `${center.y * 100}%` }}
-        >
-          {seat.seatId}
-        </span>
-        {seat.state !== "empty" && (
+      <>
+        {tablePolygon.length >= 3 && (
           <span
-            className="seat-polygon-icon"
+            className={`table-overlay tone-${meta.tone} ${seat.tableChanged ? "is-changed" : ""}`}
+            style={{ clipPath: polygonToClipPath(tablePolygon) }}
+            aria-hidden="true"
+          />
+        )}
+        <button
+          type="button"
+          className={`seat-overlay is-polygon tone-${meta.tone} ${selected ? "is-selected" : ""}`}
+          style={{ clipPath }}
+          onClick={() => onSelect(seat.seatId)}
+          aria-label={`${seat.seatId} ${meta.label}`}
+        >
+          <span
+            className="seat-label polygon-label"
             style={{ left: `${center.x * 100}%`, top: `${center.y * 100}%` }}
           >
-            <Icon name={meta.icon} />
+            {seat.seatId}
           </span>
-        )}
-      </button>
+          {seat.state !== "empty" && (
+            <span
+              className="seat-polygon-icon"
+              style={{ left: `${center.x * 100}%`, top: `${center.y * 100}%` }}
+            >
+              <Icon name={meta.icon} />
+            </span>
+          )}
+        </button>
+      </>
     );
   }
   return (
@@ -869,7 +881,9 @@ function normSeats(raw) {
     ...s,
     // roi가 없으면 빈 객체 (SeatOverlay에서 방어 처리)
     roi:            s.roi ?? {},
-    polygon:        s.polygon ?? [],
+    polygon:        s.polygon ?? s.seatPolygon ?? [],
+    seatPolygon:    s.seatPolygon ?? s.polygon ?? [],
+    tablePolygon:   s.tablePolygon ?? [],
     elapsedSeconds: s.elapsedSeconds ?? s.accumulatedSeconds ?? 0,
     belongings:     s.belongings ?? [],
     tableChanged:   s.tableChanged ?? false,

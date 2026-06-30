@@ -413,7 +413,16 @@ def _build_app(
             "imageWidth":  width,
             "imageHeight": height,
             "seats": [
-                {"seatId": cfg["seatId"], "label": cfg["label"], "roi": cfg["roi"], "polygon": cfg.get("polygon", [])}
+                {
+                    "seatId": cfg["seatId"],
+                    "label": cfg["label"],
+                    "roi": cfg["roi"],
+                    "seatRoi": cfg.get("seatRoi", cfg["roi"]),
+                    "tableRoi": cfg.get("tableRoi", cfg["roi"]),
+                    "polygon": cfg.get("polygon", []),
+                    "seatPolygon": cfg.get("seatPolygon", cfg.get("polygon", [])),
+                    "tablePolygon": cfg.get("tablePolygon", cfg.get("polygon", [])),
+                }
                 for cfg in seat_configs.values()
             ],
         }

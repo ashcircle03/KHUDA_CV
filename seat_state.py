@@ -267,7 +267,7 @@ class SeatStateEngine:
         settings: dict,
     ) -> dict[str, tuple[Box, float]]:
         h, w = frame.shape[:2]
-        polygons = self._roi_config.pixel_polygons(w, h)
+        polygons = self._roi_config.seat_pixel_polygons(w, h)
         result: dict[str, tuple[Box, float]] = {}
         min_overlap = float(settings["seatedPersonOverlap"])
         for box in boxes:

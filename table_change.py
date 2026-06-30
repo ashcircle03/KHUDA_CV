@@ -43,7 +43,7 @@ class TableChangeDetector:
         static_threshold = float(settings["tableStaticThreshold"])
 
         h, w = frame.shape[:2]
-        polygons = self._roi_config.pixel_polygons(w, h)
+        polygons = self._roi_config.table_pixel_polygons(w, h)
         current_edges = _edge_features(frame)
         baseline_edges = _edge_features(baseline)
 

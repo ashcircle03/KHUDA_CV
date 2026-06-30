@@ -18,15 +18,17 @@ cd ..
 
 ## 실행 순서
 
-### 1. 좌석 ROI 설정 (최초 1회)
+### 1. 테이블/좌석 ROI 설정 (최초 1회)
 
 ```bash
 python setup_rois.py
 ```
 
 - 영상 첫 프레임이 창으로 열림
-- 마우스로 좌석 영역 드래그 → 창에서 좌석 ID 입력 (예: `A1`) → `Enter`
-- 모든 좌석 설정 후 `s` 키로 저장 → `rois.json` 생성
+- 한 좌석마다 테이블 polygon을 클릭으로 지정 후 `Enter`
+- 이어서 같은 ID에 대응되는 좌석 polygon을 클릭으로 지정 후 `Enter`
+- 창에서 좌석 ID 입력 (예: `A1`) → `Enter`
+- 모든 테이블/좌석 쌍 설정 후 `s` 키로 저장 → `rois.json` 생성
 - `r` : 마지막 ROI 취소 / `q` : 저장 없이 종료
 
 ### 2. 영상 파일 설정
@@ -74,8 +76,8 @@ ngrok http 8000
 ├── gallery.py       장기 Identity 레이어. 상태머신 + 누적 시간 관리
 ├── event_store.py   운영 이벤트 인메모리 저장소. 중복 방지 + ACK/DEFER/RESOLVE
 ├── api.py           FastAPI 서버. REST + WebSocket + MJPEG 스트림
-├── setup_rois.py    좌석 ROI 설정 도구 (OpenCV GUI)
-├── rois.json        좌석 ROI 폴리곤 좌표 (setup_rois.py로 생성)
+├── setup_rois.py    테이블/좌석 ROI 설정 도구 (OpenCV GUI)
+├── rois.json        테이블/좌석 ROI 폴리곤 좌표 (setup_rois.py로 생성)
 ├── cafe_cctv.mp4    입력 영상
 └── frontend/        React 프론트엔드 (Vite + React)
 ```
@@ -122,15 +124,15 @@ ngrok http 8000
 
 | 상태 | 조건 | 시간 |
 |---|---|---|
-| SEATED | 사람이 ROI 안에 있음 | 흐름 |
-| AWAY | 사람 없음 + 짐이 ROI 안에 있음 | 흐름 |
-| LEFT | 사람 없음 + 짐도 없음 | 종료 → Gallery에서 제거 |
+| SEATED | 테이블 변화 있음 + 사람이 좌석 polygon 안에 있음 | 흐름 |
+| AWAY | 테이블 변화 있음 + 좌석 polygon에 사람 없음 | 흐름 |
+| LEFT | 테이블 변화가 baseline 수준으로 복귀 | 종료 |
 
 SEATED·AWAY 모두 시간이 흐름 (좌석이 막혀 있는 건 동일).
 
-### 짐을 퇴장 의사의 신호로 활용
-- 짐 있음 → AWAY (돌아올 의사)
-- 짐 없음 → LEFT 즉시 확정 (타임아웃 없음)
+### 테이블/좌석 ROI 분리
+- 테이블 점유 판정은 테이블 polygon과 `baseline_empty.jpg`의 edge 변화 비교로 수행한다.
+- 착석 사람 판정은 같은 ID에 연결된 좌석 polygon 기준으로 수행한다.
 
 ### Gallery를 사람 단위로 관리
 - 좌석 이동해도 누적 시간 유지
