@@ -69,7 +69,7 @@ ngrok http 8000
 9th-CV-team2/
 ├── main.py          실행 진입점. 전체 파이프라인 조립 및 프레임 루프
 ├── camera.py        VideoCapture 래퍼. 파일/카메라 동일 인터페이스
-├── detector.py      YOLOv8s COCO 감지. 사람(conf≥0.3) / 짐(conf≥0.2) 분리 반환
+├── detector.py      YOLOv8s COCO 감지. 사람 class만 반환
 ├── tracker.py       BoT-SORT + OSNet 추적. Gallery 이벤트 호출 및 ROI 판별
 ├── gallery.py       장기 Identity 레이어. 상태머신 + 누적 시간 관리
 ├── event_store.py   운영 이벤트 인메모리 저장소. 중복 방지 + ACK/DEFER/RESOLVE
@@ -90,7 +90,7 @@ ngrok http 8000
         ↓
 [Camera]  프레임 단위 읽기
         ↓
-[Detector]  YOLOv8s → 사람 박스 / 짐 박스 분리
+[Detector]  YOLOv8s → 사람 박스 감지
         ↓
 [Tracker]  BoT-SORT 단기 추적 + OSNet 임베딩
   - 신규 tracklet → gallery.on_new_tracklet()
@@ -202,7 +202,7 @@ SEATED·AWAY 모두 시간이 흐름 (좌석이 막혀 있는 건 동일).
 | 임베딩 유사도 임계값 | gallery.py | 0.65 |
 | 이용 제한 시간 | gallery.py / settings | 7200s |
 | 자리비움 기준 | gallery.py / settings | 300s |
-| YOLO confidence | detector.py | person 0.3 / 짐 0.2 |
+| YOLO confidence | detector.py | person 0.25 |
 | BoT-SORT lost patience | tracker.py | 45 frames |
 
 ---
@@ -211,4 +211,4 @@ SEATED·AWAY 모두 시간이 흐름 (좌석이 막혀 있는 건 동일).
 
 **사람**: person (cls 0)
 
-**짐**: backpack · handbag · suitcase · bottle · cup · laptop · mouse · keyboard · book
+짐/물건 여부는 bbox detector가 아니라 `baseline_empty.jpg` 대비 테이블 ROI 구조 변화로 판단한다.

@@ -382,7 +382,7 @@ def _build_app(
         return {
             "status": "ok",
             "serverTime": _now_iso(),
-            "model": {"detector": "YOLOE-26S-Seg", "state": "SeatStateEngine", "reid": "OSNet/fallback"},
+            "model": {"detector": "YOLOv8s-person", "state": "SeatStateEngine", "reid": "OSNet/fallback"},
         }
 
     @app.get("/api/dashboard")
