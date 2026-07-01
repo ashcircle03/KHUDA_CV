@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -23,11 +22,13 @@ class TableChangeDetector:
         self,
         roi_config: RoiConfig,
         settings: RuntimeSettings,
+        baseline_frame: np.ndarray | None = None,
     ) -> None:
         self._roi_config = roi_config
         self._settings = settings
-        self._baseline_path: str | None = None
-        self._baseline: np.ndarray | None = None
+        self._baseline: np.ndarray | None = (
+            baseline_frame.copy() if baseline_frame is not None else None
+        )
         self._last_scores: dict[str, float] = {}
         self._states: dict[str, bool] = {seat_id: False for seat_id in roi_config.seat_ids()}
 
@@ -36,7 +37,7 @@ class TableChangeDetector:
         self._states = {seat_id: False for seat_id in self._roi_config.seat_ids()}
 
     def evaluate(self, frame: np.ndarray) -> dict[str, TableChange]:
-        baseline = self._load_baseline(frame.shape[1], frame.shape[0])
+        baseline = self._baseline_for(frame)
         settings = self._settings.snapshot()
         enter = float(settings["tableChangeEnterThreshold"])
         exit_ = float(settings["tableChangeExitThreshold"])
@@ -65,19 +66,11 @@ class TableChangeDetector:
             )
         return result
 
-    def _load_baseline(self, width: int, height: int) -> np.ndarray:
-        path = str(self._settings.get("baselineImagePath", "baseline_empty.jpg"))
-        if self._baseline is None or path != self._baseline_path:
-            baseline = cv2.imread(path)
-            if baseline is None:
-                raise FileNotFoundError(
-                    f"baseline image not found: {path}. "
-                    "Run capture_baseline.py before starting main.py."
-                )
-            self._baseline = baseline
-            self._baseline_path = path
-
+    def _baseline_for(self, frame: np.ndarray) -> np.ndarray:
+        if self._baseline is None:
+            self._baseline = frame.copy()
         assert self._baseline is not None
+        height, width = frame.shape[:2]
         if self._baseline.shape[1] == width and self._baseline.shape[0] == height:
             return self._baseline
         return cv2.resize(self._baseline, (width, height), interpolation=cv2.INTER_AREA)

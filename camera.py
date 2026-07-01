@@ -53,6 +53,24 @@ class Camera:
     def is_seekable(self) -> bool:
         return self._is_seekable
 
+    def first_frame(self) -> np.ndarray | None:
+        """Return the source baseline frame without consuming video playback."""
+        with self._lock:
+            if self._is_seekable:
+                current = self._cap.get(cv2.CAP_PROP_POS_FRAMES) or 0
+                self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self._cap.read()
+                self._cap.set(cv2.CAP_PROP_POS_FRAMES, current)
+                return frame.copy() if ret else None
+
+            if self._last_frame is not None:
+                return self._last_frame.copy()
+            ret, frame = self._cap.read()
+            if not ret:
+                return None
+            self._last_frame = frame.copy()
+            return frame.copy()
+
     def read(self) -> np.ndarray | None:
         with self._lock:
             ret, frame = self._cap.read()

@@ -131,7 +131,7 @@ ngrok http 8000
 SEATED·AWAY 모두 시간이 흐름 (좌석이 막혀 있는 건 동일).
 
 ### 테이블/좌석 ROI 분리
-- 테이블 점유 판정은 테이블 polygon과 `baseline_empty.jpg`의 edge 변화 비교로 수행한다.
+- 테이블 점유 판정은 테이블 polygon과 영상 첫 프레임 baseline의 edge 변화 비교로 수행한다.
 - 착석 사람 판정은 같은 ID에 연결된 좌석 polygon 기준으로 수행한다.
 
 ### Gallery를 사람 단위로 관리
@@ -213,4 +213,4 @@ SEATED·AWAY 모두 시간이 흐름 (좌석이 막혀 있는 건 동일).
 
 **사람**: person (cls 0)
 
-짐/물건 여부는 bbox detector가 아니라 `baseline_empty.jpg` 대비 테이블 ROI 구조 변화로 판단한다.
+짐/물건 여부는 bbox detector가 아니라 영상 첫 프레임 baseline 대비 테이블 ROI 구조 변화로 판단한다.

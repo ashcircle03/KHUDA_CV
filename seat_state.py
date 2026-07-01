@@ -42,12 +42,13 @@ class SeatStateEngine:
         self,
         roi_config: RoiConfig,
         settings: RuntimeSettings,
+        baseline_frame: np.ndarray | None = None,
         reid_model: str = "osnet_x0_25_msmt17.pt",
         device: str = "cpu",
     ) -> None:
         self._roi_config = roi_config
         self._settings = settings
-        self._table_detector = TableChangeDetector(roi_config, settings)
+        self._table_detector = TableChangeDetector(roi_config, settings, baseline_frame)
         self._embedder = _PersonEmbedder(reid_model, device)
         self._states = {
             seat_id: _SeatState(seat_id=seat_id)

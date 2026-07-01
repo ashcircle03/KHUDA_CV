@@ -27,7 +27,6 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "identityChangeDistance": 0.35,
     "identityChangeConfirmSamples": 2,
     "embeddingWindowSize": 5,
-    "baselineImagePath": "baseline_empty.jpg",
 }
 
 
@@ -60,7 +59,6 @@ SETTING_RULES: dict[str, SettingRule] = {
     "identityChangeDistance": SettingRule(float, 0, 2),
     "identityChangeConfirmSamples": SettingRule(int, 1, 20),
     "embeddingWindowSize": SettingRule(int, 1, 50),
-    "baselineImagePath": SettingRule(str),
 }
 
 

@@ -58,10 +58,11 @@ def _draw_debug(
 def main() -> None:
     settings = RuntimeSettings()
     camera = Camera(source="cafe_cctv.mp4")  # 실시간 카메라: source=0
+    baseline_frame = camera.first_frame()
     frame_w, frame_h = camera.size
     roi_config = RoiConfig.load("rois.json", frame_w or 1280, frame_h or 720)
     detector = Detector()
-    state_engine = SeatStateEngine(roi_config, settings)
+    state_engine = SeatStateEngine(roi_config, settings, baseline_frame=baseline_frame)
     reset_event = threading.Event()
 
     start_api(
@@ -105,17 +106,12 @@ def main() -> None:
             else:
                 last_detections = DetectionResult(person_boxes=[], luggage_boxes=[])
 
-            try:
-                state_engine.update(
-                    frame,
-                    last_detections,
-                    person_sample=person_sample,
-                    frame_index=frame_idx,
-                )
-            except FileNotFoundError as exc:
-                print(f"[main] {exc}")
-                print("[main] baseline 캡처 후 다시 실행하세요: python capture_baseline.py")
-                break
+            state_engine.update(
+                frame,
+                last_detections,
+                person_sample=person_sample,
+                frame_index=frame_idx,
+            )
 
             push_frame(frame, _draw_debug(frame, last_detections, state_engine, roi_config))
             frame_idx += 1

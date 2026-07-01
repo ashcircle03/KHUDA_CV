@@ -145,7 +145,6 @@ const SETTINGS_FIELDS = [
   { key: "identityChangeDistance", label: "임베딩 변화 거리", unit: "", min: 0, max: 2, step: 0.01 },
   { key: "identityChangeConfirmSamples", label: "임베딩 변화 확인", unit: "회", min: 1, max: 20, step: 1 },
   { key: "embeddingWindowSize", label: "임베딩 평균 창", unit: "개", min: 1, max: 50, step: 1 },
-  { key: "baselineImagePath", label: "Baseline 파일", unit: "", type: "text" },
 ];
 
 // ── API 헬퍼 ─────────────────────────────────────────────────────────────────
@@ -355,7 +354,7 @@ function PolicyModal({ policy, onClose, onSave }) {
 
         <div className="modal-note">
           <Icon name="info" />
-          테이블 baseline 대비 구조 변화가 있으면 점유로 보고, 사람 탐지는 SEATED/AWAY 분기에만 사용합니다.
+          영상 첫 프레임 baseline 대비 구조 변화가 있으면 점유로 보고, 사람 탐지는 SEATED/AWAY 분기에만 사용합니다.
         </div>
 
         <div className="modal-actions">
