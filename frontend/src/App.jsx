@@ -1,20 +1,88 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-function GalleryGrid({ persons }) {
-  const [lightbox, setLightbox] = useState(null);
+const SNAPSHOT_REASON_META = {
+  SESSION_STARTED:   { label: "신규 등록",     tone: "gray" },
+  IDENTITY_CHANGE:   { label: "신원 변경 후보", tone: "red" },
+  PERSON_REGISTERED: { label: "신규 등록",     tone: "gray" },
+};
+
+function SnapshotReasonBadge({ reason, identityDistance }) {
+  const meta = SNAPSHOT_REASON_META[reason] ?? { label: reason ?? "-", tone: "gray" };
   return (
-    <>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:12,marginTop:12}}>
-        {persons.map(p => (
+    <p style={{fontSize:11,marginTop:4}}>
+      <span className={`status-chip tone-${meta.tone}`} style={{fontSize:10,padding:"1px 6px"}}>
+        {meta.label}
+      </span>
+      {reason === "IDENTITY_CHANGE" && (
+        <span style={{marginLeft:4,color:"var(--text-secondary,#888)"}}>
+          거리 {Number(identityDistance ?? 0).toFixed(3)}
+        </span>
+      )}
+    </p>
+  );
+}
+
+// 같은 좌석 + 같은 세션(퇴석 전까지 이어지는 한 번의 점유)을 하나의 묶음으로 본다.
+// 세션 안에서 IDENTITY_CHANGE가 찍혔다면 그 시점부터 "다른 사람일 수 있음" 후보로
+// 같은 묶음 안에 순서대로 표시해, 동일인 여부를 한눈에 비교할 수 있게 한다.
+function groupSnapshots(persons) {
+  const map = new Map();
+  for (const p of persons) {
+    const key = `${p.seatId}__${p.sessionId || p.personId}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(p);
+  }
+  const groups = [...map.values()].map((items) => {
+    const sorted = [...items].sort((a, b) => new Date(a.capturedAt) - new Date(b.capturedAt));
+    const last = sorted[sorted.length - 1];
+    return {
+      key: `${last.seatId}__${last.sessionId || last.personId}`,
+      seatId: last.seatId,
+      items: sorted,
+      startedAt: sorted[0].capturedAt,
+      latestAt: last.capturedAt,
+      identityChangeCount: sorted.filter((s) => s.reason === "IDENTITY_CHANGE").length,
+    };
+  });
+  groups.sort((a, b) => new Date(b.latestAt) - new Date(a.latestAt));
+  return groups;
+}
+
+function GalleryGroupCard({ group, onOpenImage }) {
+  return (
+    <div style={{border:"1px solid var(--border-color,#e5e5e5)",borderRadius:10,padding:12,marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,flexWrap:"wrap",gap:4}}>
+        <strong style={{fontSize:13}}>좌석 {group.seatId}</strong>
+        <span style={{fontSize:11,color:"var(--text-secondary,#888)"}}>
+          {new Date(group.startedAt).toLocaleString("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})} 등록 시작
+          {group.identityChangeCount > 0 && ` · 신원 변경 후보 ${group.identityChangeCount}회`}
+        </span>
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {group.items.map((p) => (
           <div key={p.personId} style={{textAlign:"center",cursor:"pointer"}}
-            onClick={() => setLightbox(p.fullImage)}>
+            onClick={() => onOpenImage(p.fullImage)}>
             <img src={p.thumbnail} alt={`person-${p.personId}`}
-              style={{width:"100%",borderRadius:8,objectFit:"cover",aspectRatio:"3/4",background:"#222"}} />
-            <p style={{fontSize:12,marginTop:4,fontWeight:600}}>좌석 {p.seatId}</p>
-            <p style={{fontSize:11,color:"var(--text-secondary,#888)"}}>
+              style={{width:88,height:112,borderRadius:8,objectFit:"cover",background:"#222"}} />
+            <p style={{fontSize:11,color:"var(--text-secondary,#888)",marginTop:2}}>
               {new Date(p.capturedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}
             </p>
+            <SnapshotReasonBadge reason={p.reason} identityDistance={p.identityDistance} />
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SnapshotGroupList({ persons }) {
+  const [lightbox, setLightbox] = useState(null);
+  const groups = groupSnapshots(persons);
+  return (
+    <>
+      <div style={{marginTop:12}}>
+        {groups.map((g) => (
+          <GalleryGroupCard key={g.key} group={g} onOpenImage={setLightbox} />
         ))}
       </div>
       {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
@@ -45,14 +113,16 @@ function GalleryModal({ onClose }) {
     return () => clearInterval(t);
   }, []);
 
+  const groupCount = groupSnapshots(persons).length;
+
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <section className="modal" style={{maxWidth:700}} role="dialog" aria-modal="true"
         onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <p className="eyebrow">등록 인원</p>
-            <h2>현재 갤러리 ({persons.length}명)</h2>
+            <p className="eyebrow">등록 인원 — 지금 화면에 없어도 지금까지 임베딩을 뽑은 인원은 계속 보관됩니다</p>
+            <h2>현재 갤러리 ({groupCount}명 · 스냅샷 {persons.length}장)</h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose}>
             <Icon name="close" />
@@ -60,7 +130,7 @@ function GalleryModal({ onClose }) {
         </div>
         {persons.length === 0
           ? <p style={{color:"var(--text-secondary,#888)",padding:"16px 0"}}>등록된 인원이 없습니다.</p>
-          : <GalleryGrid persons={persons} />
+          : <SnapshotGroupList persons={persons} />
         }
       </section>
     </div>
@@ -128,7 +198,6 @@ const SETTINGS_FIELDS = [
   { key: "useLimitSeconds", label: "이용 제한", unit: "초", min: 60, max: 86400, step: 60 },
   { key: "nearLimitBeforeSeconds", label: "임박 알림", unit: "초 전", min: 0, max: 21600, step: 60 },
   { key: "awayThresholdSeconds", label: "자리비움 알림", unit: "초", min: 30, max: 43200, step: 60 },
-  { key: "leftGraceSeconds", label: "퇴석 유예", unit: "초", min: 0, max: 3600, step: 5 },
   { key: "personDetectionIntervalSeconds", label: "사람 탐지 주기", unit: "초", min: 1, max: 120, step: 1 },
   { key: "tableDiffIntervalFrames", label: "테이블 비교 주기", unit: "프레임", min: 1, max: 600, step: 1 },
   { key: "tableChangeEnterThreshold", label: "변화 진입 임계값", unit: "", min: 0, max: 1, step: 0.001 },
@@ -136,12 +205,6 @@ const SETTINGS_FIELDS = [
   { key: "tableStaticThreshold", label: "정적 판단 임계값", unit: "", min: 0, max: 1, step: 0.001 },
   { key: "tableStaticConfirmSeconds", label: "정적 확인 시간", unit: "초", min: 0, max: 3600, step: 1 },
   { key: "seatedPersonOverlap", label: "사람-좌석 겹침", unit: "", min: 0, max: 1, step: 0.01 },
-  { key: "seatedHipYRatio", label: "앉음 anchor 위치", unit: "", min: 0, max: 1, step: 0.01 },
-  { key: "seatedHeightWidthRatioThreshold", label: "사람 세로/가로 상한", unit: "", min: 0.5, max: 10, step: 0.05 },
-  { key: "minPersonToRoiWidthRatio", label: "사람 폭 하한", unit: "", min: 0, max: 5, step: 0.01 },
-  { key: "maxPersonToRoiHeightRatio", label: "사람 높이 상한", unit: "", min: 0.1, max: 10, step: 0.05 },
-  { key: "standingBottomExcessRatio", label: "서있는 하단 초과", unit: "", min: 0, max: 5, step: 0.01 },
-  { key: "standingHeightRatio", label: "서있는 높이 비율", unit: "", min: 0.1, max: 10, step: 0.05 },
   { key: "identityChangeDistance", label: "임베딩 변화 거리", unit: "", min: 0, max: 2, step: 0.01 },
   { key: "identityChangeConfirmSamples", label: "임베딩 변화 확인", unit: "회", min: 1, max: 20, step: 1 },
   { key: "embeddingWindowSize", label: "임베딩 평균 창", unit: "개", min: 1, max: 50, step: 1 },
@@ -422,6 +485,7 @@ export function App() {
   const [connected,      setConnected]      = useState(false);
   const [now,            setNow]            = useState(new Date());
   const [seatSnapshots,  setSeatSnapshots]  = useState([]);
+  const [tableState,     setTableState]     = useState(null);
   const [lightboxSrc,    setLightboxSrc]    = useState(null);
   const [cameraLayout,   setCameraLayout]   = useState({ imageWidth: 16, imageHeight: 9 });
   const [videoStatus,    setVideoStatus]    = useState(VIDEO_STATUS_DEFAULT);
@@ -614,6 +678,20 @@ export function App() {
       .catch(() => setSeatSnapshots([]));
   }, []);
 
+  // 선택 좌석의 초기/현재 테이블 상태 + 유사도 폴링
+  useEffect(() => {
+    if (!selectedId) { setTableState(null); return; }
+    let cancelled = false;
+    const load = () => {
+      apiFetch(`/api/seats/${selectedId}/table-state`)
+        .then(d => { if (!cancelled) setTableState(d); })
+        .catch(() => { if (!cancelled) setTableState(null); });
+    };
+    load();
+    const t = setInterval(load, 3000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [selectedId]);
+
   const selectedSeat = seats.find((s) => s.seatId === selectedId) ?? seats[0];
   const selectedMeta = STATE_META[selectedSeat?.state] ?? STATE_META.empty;
   const pendingCount = events.filter((e) => e.status === "UNCONFIRMED").length;
@@ -688,7 +766,7 @@ export function App() {
             className="camera-frame"
             style={{ aspectRatio: `${cameraLayout.imageWidth} / ${cameraLayout.imageHeight}` }}
           >
-            <img src={`/api/cameras/main/stream?v=${streamNonce}`} alt="카페 CCTV 실시간 영상"
+            <img src={`/api/cameras/main/stream?overlay=true&v=${streamNonce}`} alt="카페 CCTV 실시간 영상"
               onError={(e) => { e.target.src = "/cafe-camera-fallback.png"; }} />
             <div className="camera-shade" />
             {seats.map((seat) => (
@@ -777,20 +855,54 @@ export function App() {
               <span className={`status-chip tone-${selectedMeta.tone}`}>{selectedMeta.label}</span>
             </div>
 
-            {/* 등록 인물 스냅샷 — 여러 명 */}
+            {/* 초기/현재 테이블 상태 비교 + 유사도 지표 여러 개 */}
+            {tableState && (
+              <div style={{marginBottom:12}}>
+                <p style={{fontSize:11,color:"var(--text-secondary,#888)",marginBottom:6}}>
+                  테이블 상태 비교 — 판정 기준 유사도 {(tableState.occupancySimilarity * 100).toFixed(1)}%
+                </p>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <div style={{flex:1,textAlign:"center"}}>
+                    <img src={tableState.baselineImage} alt="초기 테이블 상태"
+                      style={{width:"100%",borderRadius:6,objectFit:"cover",aspectRatio:"4/3",
+                        border:"2px solid var(--border-color,#e5e5e5)",cursor:"pointer"}}
+                      onClick={() => setLightboxSrc(tableState.baselineImage)} />
+                    <small style={{fontSize:11,color:"var(--text-secondary,#888)"}}>초기 상태</small>
+                  </div>
+                  <div style={{flex:1,textAlign:"center"}}>
+                    <img src={tableState.currentImage} alt="현재 테이블 상태"
+                      style={{width:"100%",borderRadius:6,objectFit:"cover",aspectRatio:"4/3",
+                        border:"2px solid var(--border-color,#e5e5e5)",cursor:"pointer"}}
+                      onClick={() => setLightboxSrc(tableState.currentImage)} />
+                    <small style={{fontSize:11,color:"var(--text-secondary,#888)"}}>현재 상태</small>
+                  </div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  {(tableState.metrics ?? []).map((m) => (
+                    <div key={m.key} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:11,width:96,flexShrink:0,color:"var(--text-secondary,#888)"}}>
+                        {m.label}
+                      </span>
+                      <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg-secondary,#eee)",overflow:"hidden"}}>
+                        <div style={{width:`${(m.similarity * 100).toFixed(1)}%`,height:"100%",
+                          background:"var(--accent-color,#4a90d9)"}} />
+                      </div>
+                      <span style={{fontSize:11,width:40,textAlign:"right"}}>
+                        {(m.similarity * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 등록 인물 스냅샷 — 세션(방문) 단위로 묶어서 표시 */}
             {seatSnapshots.length > 0 && (
               <div style={{marginBottom:12}}>
                 <p style={{fontSize:11,color:"var(--text-secondary,#888)",marginBottom:6}}>
-                  등록 인원 {seatSnapshots.length}명 — 클릭하면 풀 이미지
+                  등록/신원변경 스냅샷 {seatSnapshots.length}건 — 클릭하면 풀 이미지, OSNet 동일인 판정 근거 확인용
                 </p>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  {seatSnapshots.map(s => (
-                    <img key={s.personId} src={s.thumbnail} alt={`person-${s.personId}`}
-                      style={{width:72,height:96,objectFit:"cover",borderRadius:6,
-                        cursor:"pointer",border:"2px solid var(--border-color,#e5e5e5)"}}
-                      onClick={() => setLightboxSrc(s.fullImage)} />
-                  ))}
-                </div>
+                <SnapshotGroupList persons={seatSnapshots} />
               </div>
             )}
             {seatSnapshots.length === 0 && selectedSeat?.state !== "empty" && (

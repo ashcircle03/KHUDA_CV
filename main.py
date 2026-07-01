@@ -14,38 +14,9 @@ from runtime_config import RuntimeSettings
 from seat_state import SeatStateEngine
 
 
-def _draw_debug(
-    frame: np.ndarray,
-    det: DetectionResult,
-    state_engine: SeatStateEngine,
-    roi_config: RoiConfig,
-) -> np.ndarray:
+def _draw_debug(frame: np.ndarray, det: DetectionResult) -> np.ndarray:
+    """사람 탐지 bbox만 그린다. 좌석/테이블 ROI는 프론트엔드가 자체적으로 그린다."""
     vis = frame.copy()
-    h, w = frame.shape[:2]
-    table_polygons = roi_config.table_pixel_polygons(w, h)
-    seat_polygons = roi_config.seat_pixel_polygons(w, h)
-    status_by_seat = {entry["seatId"]: entry for entry in state_engine.get_status()}
-
-    for seat_id, seat_poly in seat_polygons.items():
-        entry = status_by_seat.get(seat_id)
-        state = entry["occupancyState"] if entry else "EMPTY"
-        if state == "SEATED":
-            color = (0, 220, 80)
-        elif state == "AWAY":
-            color = (255, 150, 0)
-        else:
-            color = (200, 200, 200)
-        table_poly = table_polygons.get(seat_id)
-        if table_poly is not None:
-            cv2.polylines(vis, [table_poly], True, (0, 210, 255), 1)
-        cv2.polylines(vis, [seat_poly], True, color, 2)
-        pts = seat_poly.reshape(-1, 2)
-        x, y = int(pts[:, 0].min()), int(pts[:, 1].min())
-        score = entry.get("tableChangeScore", 0.0) if entry else 0.0
-        label = f"{seat_id}: {state} {score:.3f}"
-        cv2.putText(vis, label, (x + 4, y + 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.58, color, 2)
-
     for b in det.person_boxes:
         x1, y1, x2, y2 = map(int, b.xyxy)
         cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 220, 80), 2)
@@ -103,8 +74,8 @@ def main() -> None:
             if person_sample:
                 last_detections = detector.detect_person_only(frame)
                 next_person_detection_at = loop_start + interval
-            else:
-                last_detections = DetectionResult(person_boxes=[], luggage_boxes=[])
+            # person_sample이 False인 프레임은 last_detections를 그대로 유지해
+            # bbox가 다음 탐지 시점까지 화면에 남아있도록 한다.
 
             state_engine.update(
                 frame,
@@ -113,7 +84,7 @@ def main() -> None:
                 frame_index=frame_idx,
             )
 
-            push_frame(frame, _draw_debug(frame, last_detections, state_engine, roi_config))
+            push_frame(frame, _draw_debug(frame, last_detections))
             frame_idx += 1
 
             fps = max(float(camera.fps), 1.0)

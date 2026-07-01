@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import threading
 import time
 from datetime import datetime, timezone, timedelta
@@ -469,6 +470,47 @@ def _build_app(
             raise HTTPException(status_code=404, detail="스냅샷 없음")
         return {"snapshots": snaps}
 
+    _METRIC_LABELS = {
+        "pixel":     "픽셀 차이",
+        "ssim":      "SSIM (구조적 유사도)",
+        "edge":      "엣지(질감) 비교",
+        "histogram": "색상 히스토그램",
+    }
+    _OCCUPANCY_METRIC_KEY = "histogram"  # 점유 판정에 실제로 쓰는 지표
+
+    @app.get("/api/seats/{seat_id}/table-state")
+    def get_table_state(seat_id: str):
+        frame = _frame_buffer.get(overlay=False)
+        if frame is None:
+            raise HTTPException(status_code=503, detail="스트림 프레임 없음")
+        regions = state_store.get_table_regions(seat_id, frame)
+        if regions is None:
+            raise HTTPException(status_code=404, detail="존재하지 않는 좌석입니다.")
+
+        def _encode(img):
+            _, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            return "data:image/jpeg;base64," + base64.b64encode(buf).decode()
+
+        occupancy_score = float(regions["occupancy_score"])
+        return {
+            "seatId": seat_id,
+            "baselineImage": _encode(regions["baseline_crop"]),
+            "currentImage": _encode(regions["current_crop"]),
+            # 실제 SEATED/AWAY 판정에 쓰인 값 (테이블/좌석 중 더 크게 변한 쪽, 색상 히스토그램 기반)
+            "occupancyScore": round(occupancy_score, 4),
+            "occupancySimilarity": round(max(0.0, 1.0 - occupancy_score), 4),
+            # 참고용 지표들 (테이블 영역만 비교). histogram이 실제 판정 지표와 같은 계열이다.
+            "metrics": [
+                {
+                    "key": key,
+                    "label": _METRIC_LABELS[key],
+                    "similarity": round(value, 4),
+                    "isOccupancyMetric": key == _OCCUPANCY_METRIC_KEY,
+                }
+                for key, value in regions["metrics"].items()
+            ],
+        }
+
     @app.get("/api/settings")
     def get_settings():
         return {"settings": settings_store.snapshot()}
@@ -501,8 +543,8 @@ def _build_app(
                 status_code=409,
                 detail={"error": {"code": "SOURCE_NOT_SEEKABLE", "message": str(exc)}},
             ) from exc
+        # 갤러리(snapshot_store)는 영상 탐색과 무관하게 계속 누적되어야 하므로 지우지 않는다.
         state_store.reset()
-        snapshot_store.clear()
         events.reset()
         prev_states.clear()
         if on_reset is not None:

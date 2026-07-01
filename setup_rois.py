@@ -5,6 +5,7 @@
   Enter           테이블 polygon 확정 -> 좌석 polygon 입력 -> ID 입력/저장
   Backspace       마지막 꼭짓점 또는 ID 한 글자 삭제
   r               마지막 저장 ROI 쌍 삭제
+                  (기존 ID로 재확정하면 해당 좌석만 자동 덮어쓰기됨)
   Esc             현재 테이블/좌석 입력 취소
   s               rois.json 저장 후 종료
   q               저장 없이 종료
@@ -150,6 +151,10 @@ def confirm_pair(width: int, height: int) -> None:
     if len(points) < 3 or not typed_id or not pending_table:
         return
     seat_polygon = _normalize_points(width, height)
+    existing_idx = next((i for i, s in enumerate(rois) if s.seat_id == typed_id), None)
+    if existing_idx is not None:
+        rois.pop(existing_idx)
+        print(f"  기존 {typed_id} 삭제 후 덮어쓰기")
     rois.append(SeatPolygon(typed_id, typed_id, pending_table, seat_polygon))
     print(f"  + {typed_id}: table {len(pending_table)} points / seat {len(seat_polygon)} points")
     points = []

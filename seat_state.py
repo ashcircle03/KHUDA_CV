@@ -22,7 +22,6 @@ class _SeatState:
     session_id: Optional[str] = None
     occupied_since: Optional[float] = None
     away_since: Optional[float] = None
-    empty_since: Optional[float] = None
     last_person_seen_at: Optional[float] = None
     table_static_since: Optional[float] = None
     table_changed: bool = False
@@ -120,6 +119,9 @@ class SeatStateEngine:
     def stop(self) -> None:
         return None
 
+    def get_table_regions(self, seat_id: str, frame: np.ndarray) -> Optional[dict]:
+        return self._table_detector.region_crops(seat_id, frame)
+
     def get_status(self) -> list[dict]:
         now = time.time()
         result = []
@@ -185,13 +187,9 @@ class SeatStateEngine:
         settings: dict,
     ) -> None:
         if not state.table_changed:
+            # 유사도가 회복되어 baseline과 다시 비슷해지면 유예 없이 즉시 EMPTY 처리한다.
             if state.occupancy_state != "EMPTY":
-                if state.empty_since is None:
-                    state.empty_since = now
-                if now - state.empty_since >= float(settings["leftGraceSeconds"]):
-                    self._clear_session(state)
-            else:
-                state.empty_since = None
+                self._clear_session(state)
             return
 
         state.empty_since = None
@@ -224,7 +222,6 @@ class SeatStateEngine:
         state.session_id = f"{state.seat_id}-{int(now)}-{self._session_seq}"
         state.occupied_since = now
         state.away_since = None
-        state.empty_since = None
         state.embedding_window = []
         state.identity_candidate_count = 0
         state.identity_change_count = 0
@@ -235,7 +232,6 @@ class SeatStateEngine:
         state.session_id = None
         state.occupied_since = None
         state.away_since = None
-        state.empty_since = None
         state.last_person_seen_at = None
         state.has_person = False
         state.person_confidence = 0.0
@@ -378,35 +374,14 @@ def _find_box_seat(
 ) -> tuple[Optional[str], float]:
     px1, py1, px2, py2 = map(float, xyxy)
     p_area = max((px2 - px1) * (py2 - py1), 1e-6)
-    p_w = max(px2 - px1, 1e-6)
-    p_h = max(py2 - py1, 1e-6)
-    h_w_ratio = p_h / p_w
-    anchor = ((px1 + px2) / 2, py1 + p_h * float(settings["seatedHipYRatio"]))
 
     best_seat, best_ratio = None, min_overlap
     for seat_id, polygon in polygons.items():
         rx1, ry1, rx2, ry2 = bbox_from_polygon(polygon)
-        roi_w = max(rx2 - rx1, 1e-6)
-        roi_h = max(ry2 - ry1, 1e-6)
         ix1, iy1 = max(px1, rx1), max(py1, ry1)
         ix2, iy2 = min(px2, rx2), min(py2, ry2)
         inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
         ratio = inter / p_area
-        if ratio < best_ratio:
-            continue
-        if cv2.pointPolygonTest(polygon, anchor, False) < 0:
-            continue
-        if h_w_ratio > float(settings["seatedHeightWidthRatioThreshold"]):
-            continue
-        if p_w < roi_w * float(settings["minPersonToRoiWidthRatio"]):
-            continue
-        if p_h > roi_h * float(settings["maxPersonToRoiHeightRatio"]):
-            continue
-        if (
-            py2 > ry2 + roi_h * float(settings["standingBottomExcessRatio"])
-            and p_h > roi_h * float(settings["standingHeightRatio"])
-        ):
-            continue
         if ratio > best_ratio:
             best_seat, best_ratio = seat_id, ratio
     return best_seat, float(best_ratio)

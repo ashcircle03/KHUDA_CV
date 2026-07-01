@@ -97,16 +97,6 @@ def _save_encoded(
         }
 
 
-def remove(person_id: int) -> None:
-    with _lock:
-        _snapshots.pop(f"person-{person_id}", None)
-
-
-def clear() -> None:
-    with _lock:
-        _snapshots.clear()
-
-
 def get_all() -> list[dict]:
     with _lock:
         return sorted(_snapshots.values(), key=lambda s: s["capturedAt"], reverse=True)
