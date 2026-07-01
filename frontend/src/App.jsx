@@ -156,11 +156,12 @@ function GalleryModal({ onClose }) {
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
 const STATE_META = {
-  seated:  { label: "이용 중",   tone: "green", icon: "person",   helper: "정상 이용" },
-  away:    { label: "자리비움",  tone: "blue",  icon: "work",     helper: "물건 있음" },
-  near:    { label: "이용 임박", tone: "amber", icon: "schedule", helper: "종료 임박" },
-  overdue: { label: "시간초과",  tone: "red",   icon: "timer",    helper: "추가 주문 확인 필요" },
-  empty:   { label: "비어있음",  tone: "gray",  icon: "chair",    helper: "이용 가능" },
+  seated:    { label: "이용 중",     tone: "green",  icon: "person",   helper: "정상 이용" },
+  away:      { label: "자리비움",    tone: "blue",   icon: "work",     helper: "물건 있음" },
+  away_long: { label: "장기간 부재", tone: "purple", icon: "work",     helper: "자리비움 장기화" },
+  near:      { label: "이용 임박",   tone: "amber",  icon: "schedule", helper: "종료 임박" },
+  overdue:   { label: "시간초과",    tone: "red",    icon: "timer",    helper: "추가 주문 확인 필요" },
+  empty:     { label: "비어있음",    tone: "gray",   icon: "chair",    helper: "이용 가능" },
 };
 
 const EVENT_STATE_MAP = {
@@ -168,7 +169,7 @@ const EVENT_STATE_MAP = {
   NEAR_LIMIT:      "near",
   OVERDUE:         "overdue",
   AWAY_STARTED:    "away",
-  AWAY_TOO_LONG:   "away",
+  AWAY_TOO_LONG:   "away_long",
   LEFT:            "empty",
   BELONGINGS_ONLY: "away",
 };
@@ -195,12 +196,7 @@ function formatSeatDuration(totalSeconds) {
 }
 
 function formatPolicyDuration(totalSeconds) {
-  const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  if (hours > 0 && minutes > 0) return `${hours}시간 ${minutes}분`;
-  if (hours > 0) return `${hours}시간`;
-  return `${minutes}분`;
+  return formatSeatDuration(totalSeconds);
 }
 
 function formatPlaybackTime(totalSeconds) {
@@ -245,14 +241,6 @@ const SETTINGS_FIELDS = [
   { key: "embeddingWindowSize", label: "임베딩 평균 창", unit: "개", min: 1, max: 50, step: 1 },
 ];
 
-const REQUIRED_POLICY_DEFAULTS = {
-  useLimitSeconds: 1800,
-  awayThresholdSeconds: 600,
-  tableDiffIntervalSeconds: 10,
-  tableChangeEnterThreshold: 0.18,
-  tableChangeExitThreshold: 0.10,
-};
-
 // ── API 헬퍼 ─────────────────────────────────────────────────────────────────
 
 async function apiFetch(path, options = {}) {
@@ -260,29 +248,17 @@ async function apiFetch(path, options = {}) {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
-  return res.json();
-}
-
-function policyNeedsSync(settings) {
-  if (!settings) return true;
-  return Object.entries(REQUIRED_POLICY_DEFAULTS).some(([key, value]) => (
-    Number(settings[key]) !== value
-  ));
-}
-
-async function syncPolicyDefaults(settings) {
-  if (!policyNeedsSync(settings)) return settings;
-  try {
-    const data = await apiFetch("/api/settings", {
-      method: "PATCH",
-      body: JSON.stringify(REQUIRED_POLICY_DEFAULTS),
-    });
-    return { ...settings, ...REQUIRED_POLICY_DEFAULTS, ...(data.settings ?? {}) };
-  } catch (err) {
-    console.error(err);
-    return { ...settings, ...REQUIRED_POLICY_DEFAULTS };
+  if (!res.ok) {
+    let message = `API ${path} → ${res.status}`;
+    try {
+      const body = await res.json();
+      message = body?.detail?.error?.message ?? body?.error?.message ?? message;
+    } catch {
+      // 응답 본문이 JSON이 아니면 기본 메시지를 사용한다.
+    }
+    throw new Error(message);
   }
+  return res.json();
 }
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────────────
@@ -434,11 +410,17 @@ function EventRow({ event, onConfirm }) {
   );
 }
 
-function PolicyModal({ policy, onClose, onSave }) {
+function PolicyModal({ policy, error, onClose, onSave }) {
   const [draft, setDraft] = useState({ ...policy });
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    onSave(draft);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(draft);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateField = (field, value) => {
@@ -484,9 +466,18 @@ function PolicyModal({ policy, onClose, onSave }) {
           사람 ROI가 잡히면 이용 중으로 보고, 사람이 없을 때만 테이블 변화로 자리비움을 판단합니다.
         </div>
 
+        {error && (
+          <div className="modal-note modal-note-error">
+            <Icon name="info" />
+            저장 실패: {error}
+          </div>
+        )}
+
         <div className="modal-actions">
           <button type="button" className="secondary-button" onClick={onClose}>취소</button>
-          <button type="button" className="primary-button" onClick={handleSave}>저장</button>
+          <button type="button" className="primary-button" onClick={handleSave} disabled={saving}>
+            {saving ? "저장 중…" : "저장"}
+          </button>
         </div>
       </section>
     </div>
@@ -551,6 +542,7 @@ export function App() {
   });
   const [selectedId,     setSelectedId]     = useState(null);
   const [isPolicyOpen,   setIsPolicyOpen]   = useState(false);
+  const [policyError,    setPolicyError]    = useState(null);
   const [isGalleryOpen,  setIsGalleryOpen]  = useState(false);
   const [connected,      setConnected]      = useState(false);
   const [now,            setNow]            = useState(new Date());
@@ -576,7 +568,9 @@ export function App() {
             : {
                 ...s,
                 elapsedSeconds: (s.elapsedSeconds ?? 0) + 1,
-                awaySeconds:    s.state === "away" ? (s.awaySeconds ?? 0) + 1 : s.awaySeconds,
+                awaySeconds:    (s.state === "away" || s.state === "away_long")
+                  ? (s.awaySeconds ?? 0) + 1
+                  : s.awaySeconds,
               }
         )
       );
@@ -594,7 +588,7 @@ export function App() {
       .then(async ([data, layout, video]) => {
         setSeats(normSeats(data.seats ?? []));
         setEvents(data.events ?? []);
-        setPolicy(await syncPolicyDefaults(data.settings ?? policy));
+        setPolicy(data.settings ?? policy);
         if (layout?.imageWidth && layout?.imageHeight) {
           setCameraLayout({
             imageWidth: layout.imageWidth,
@@ -691,10 +685,12 @@ export function App() {
         body: JSON.stringify(patch),
       });
       setPolicy(data.settings);
+      setPolicyError(null);
+      setIsPolicyOpen(false);
     } catch (err) {
       console.error(err);
+      setPolicyError(err.message);
     }
-    setIsPolicyOpen(false);
   };
 
   const refreshDashboard = useCallback(() => {
@@ -845,7 +841,7 @@ export function App() {
       <section className="metric-grid" aria-label="좌석 상태 요약">
         <MetricCard icon="chair"    label="전체 좌석" value={seats.length}               tone="gray"  />
         <MetricCard icon="person"   label="이용 중"   value={countByState(seats,"seated")} tone="green" helper="정상 이용" />
-        <MetricCard icon="work"     label="자리비움"  value={countByState(seats,"away")}   tone="blue"  helper="테이블 변화" />
+        <MetricCard icon="work"     label="자리비움"  value={countByState(seats,"away") + countByState(seats,"away_long")}   tone="blue"  helper="테이블 변화" />
         <MetricCard icon="timer"    label="시간초과"  value={countByState(seats,"overdue")} tone="red"   helper="추가 확인 필요" />
         <article className="policy-summary">
           <p>운영 정책 요약</p>
@@ -888,6 +884,7 @@ export function App() {
                 <span className="legend-item tone-amber">이용 임박</span>
                 <span className="legend-item tone-red">시간초과</span>
                 <span className="legend-item tone-blue">자리비움</span>
+                <span className="legend-item tone-purple">장기간 부재</span>
                 <span className="legend-item tone-gray">비어있음</span>
               </div>
             </div>
@@ -1024,8 +1021,8 @@ export function App() {
             )}
 
             <dl className="detail-list">
-              <div><dt>좌석 점유 시간</dt><dd>{formatDuration(selectedSeat.elapsedSeconds)}</dd></div>
-              <div><dt>자리비움 경과 시간</dt><dd>{formatDuration(selectedSeat.awaySeconds)}</dd></div>
+              <div><dt>좌석 점유 시간</dt><dd>{formatSeatDuration(selectedSeat.elapsedSeconds)}</dd></div>
+              <div><dt>자리비움 경과 시간</dt><dd>{formatSeatDuration(selectedSeat.awaySeconds)}</dd></div>
               <div>
                 <dt>물건 감지</dt>
                 <dd>
@@ -1084,7 +1081,12 @@ export function App() {
       </section>
 
       {isPolicyOpen && (
-        <PolicyModal policy={policy} onClose={() => setIsPolicyOpen(false)} onSave={handleSavePolicy} />
+        <PolicyModal
+          policy={policy}
+          error={policyError}
+          onClose={() => { setIsPolicyOpen(false); setPolicyError(null); }}
+          onSave={handleSavePolicy}
+        />
       )}
       {isGalleryOpen && (
         <GalleryModal onClose={() => setIsGalleryOpen(false)} />

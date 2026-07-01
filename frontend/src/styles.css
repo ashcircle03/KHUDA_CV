@@ -29,6 +29,8 @@
   --red-soft: #fff0ef;
   --gray: #77716b;
   --gray-soft: #f0efed;
+  --purple: #7c3aed;
+  --purple-soft: #f2eafe;
   --shadow: 0 20px 70px rgba(75, 55, 35, 0.08);
 }
 
@@ -1038,6 +1040,11 @@ tbody tr:last-child td {
   line-height: 1.55;
 }
 
+.modal-note-error {
+  background: #fdecea;
+  color: #b3261e;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1083,6 +1090,10 @@ tbody tr:last-child td {
   color: var(--gray);
 }
 
+.tone-purple {
+  color: var(--purple);
+}
+
 .metric-card.tone-green .metric-icon,
 .status-chip.tone-green,
 .recommendation.tone-green {
@@ -1113,6 +1124,12 @@ tbody tr:last-child td {
   background: var(--gray-soft);
 }
 
+.metric-card.tone-purple .metric-icon,
+.status-chip.tone-purple,
+.recommendation.tone-purple {
+  background: var(--purple-soft);
+}
+
 .seat-card.tone-green {
   background: linear-gradient(135deg, #fff, var(--green-soft));
   border-color: rgba(23, 156, 72, 0.22);
@@ -1138,6 +1155,11 @@ tbody tr:last-child td {
   border-color: rgba(119, 113, 107, 0.22);
 }
 
+.seat-card.tone-purple {
+  background: linear-gradient(135deg, #fff, var(--purple-soft));
+  border-color: rgba(124, 58, 237, 0.28);
+}
+
 .seat-overlay.tone-green {
   background: rgba(23, 156, 72, 0.13);
 }
@@ -1157,6 +1179,10 @@ tbody tr:last-child td {
 .seat-overlay.tone-gray {
   background: rgba(255, 255, 255, 0.08);
   opacity: 0.72;
+}
+
+.seat-overlay.tone-purple {
+  background: rgba(124, 58, 237, 0.2);
 }
 
 @media (max-width: 1180px) {

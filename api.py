@@ -108,7 +108,9 @@ _EVENT_MESSAGES = {
 def _computed_state(occ: str, alert: str) -> str:
     """프론트엔드 단일 state 필드 (목업 호환)."""
     if occ == "EMPTY":              return "empty"
-    if occ == "AWAY":               return "away"
+    if occ == "AWAY":
+        if alert == "AWAY_TOO_LONG": return "away_long"
+        return "away"
     if alert == "OVERDUE":          return "overdue"
     if alert == "NEAR_LIMIT":       return "near"
     return "seated"
