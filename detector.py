@@ -14,7 +14,7 @@ class Box:
     xyxy: np.ndarray  # [x1, y1, x2, y2]
     confidence: float
     cls_name: str = ""
-    keypoints: np.ndarray | None = None  # TEMP DEBUG: [17, 2] COCO pose keypoints, 테스트 후 제거 예정
+    keypoints: np.ndarray | None = None  # [17, 2] COCO pose keypoints when using a pose model.
 
 
 @dataclass
@@ -25,7 +25,7 @@ class DetectionResult:
 class Detector:
     def __init__(
         self,
-        model: str = "yolov8s-pose.pt",  # TEMP DEBUG: pose 모델 테스트용, 원래는 yolov8s.pt
+        model: str = "yolov8s-pose.pt",
         person_conf: float = 0.25,
         imgsz: int = 448,
         **_: object,
@@ -47,7 +47,7 @@ class Detector:
         )
         persons: list[Box] = []
         for r in results:
-            # TEMP DEBUG: pose 모델일 때만 keypoints 존재, 테스트 후 제거 예정
+            # Pose 모델이면 좌석 매칭 보조용 keypoint를 함께 반환한다.
             keypoints_xy = (
                 r.keypoints.xy.cpu().numpy() if r.keypoints is not None else None
             )

@@ -14,10 +14,6 @@ from runtime_config import RuntimeSettings
 from seat_state import SeatStateEngine
 
 
-# TEMP DEBUG: COCO pose keypoint 인덱스, 테스트 후 제거 예정
-_ARM_ANCHOR_KEYPOINT_INDICES = (7, 8, 9, 10)  # 팔꿈치/손목 - 판단 기준에 사용됨
-
-
 def _draw_debug(frame: np.ndarray, det: DetectionResult) -> np.ndarray:
     """사람 탐지 bbox만 그린다. 좌석/테이블 ROI는 프론트엔드가 자체적으로 그린다."""
     vis = frame.copy()
@@ -26,24 +22,6 @@ def _draw_debug(frame: np.ndarray, det: DetectionResult) -> np.ndarray:
         cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 220, 80), 2)
         cv2.putText(vis, f"person {b.confidence:.2f}", (x1, max(14, y1 - 6)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 220, 80), 1)
-
-        # TEMP DEBUG: seat 판단 기준 앵커(hip) 시각화 (테스트 후 제거 예정)
-        person_height = max(y2 - y1, 1)
-        center_x = int((x1 + x2) / 2)
-        hip_point = (center_x, int(y1 + person_height * 0.72))
-        cv2.circle(vis, hip_point, 6, (0, 0, 255), -1)
-
-        if b.keypoints is None:
-            continue
-
-        # TEMP DEBUG: 팔꿈치/손목 - seat 판단 기준 앵커로도 사용됨 (테스트 후 제거 예정)
-        for idx in _ARM_ANCHOR_KEYPOINT_INDICES:
-            if idx >= len(b.keypoints):
-                continue
-            kx, ky = b.keypoints[idx]
-            if kx <= 0 and ky <= 0:
-                continue  # 미검출 keypoint는 (0, 0)으로 나옴
-            cv2.circle(vis, (int(kx), int(ky)), 5, (0, 0, 255), -1)
 
     return vis
 

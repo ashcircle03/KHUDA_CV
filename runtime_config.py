@@ -10,8 +10,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "nearLimitBeforeSeconds": 600,
     "awayThresholdSeconds": 600,
     "eventDebounceSeconds": 10,
-    "personDetectionIntervalSeconds": 5,
-    "tableDiffIntervalSeconds": 5,
+    "personDetectionIntervalSeconds": 10,
+    "tableDiffIntervalSeconds": 10,
     "tableChangeEnterThreshold": 0.18,
     "tableChangeExitThreshold": 0.10,
     "tableStaticThreshold": 0.012,
@@ -64,8 +64,6 @@ class RuntimeSettings:
     def patch(self, updates: dict[str, Any]) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         for key, value in updates.items():
-            if key == "seatedPersonOverlap":
-                key = "seatedPersonAnchorThreshold"
             rule = SETTING_RULES.get(key)
             if rule is None:
                 continue

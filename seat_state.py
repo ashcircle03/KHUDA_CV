@@ -378,17 +378,9 @@ class _PersonEmbedder:
     def __init__(self, reid_model: str, device: str) -> None:
         self._model = None
         try:
-            from boxmot.trackers.tracker_zoo import create_tracker, get_tracker_config
+            from boxmot.reid.core.reid import ReID
 
-            tracker = create_tracker(
-                tracker_type="botsort",
-                tracker_config=get_tracker_config("botsort"),
-                reid_weights=Path(reid_model),
-                device=device,
-                half=False,
-                per_class=False,
-            )
-            self._model = getattr(tracker, "model", None)
+            self._model = ReID(path=Path(reid_model), device=device, half=False)
         except Exception:
             self._model = None
 
@@ -397,8 +389,7 @@ class _PersonEmbedder:
             return None
         if self._model is not None:
             try:
-                resized = cv2.resize(crop, (128, 256))
-                feat = self._model(resized[np.newaxis])
+                feat = self._model([crop])
                 vec = np.asarray(feat[0], dtype=np.float32)
                 norm = np.linalg.norm(vec)
                 return vec / norm if norm > 0 else vec
@@ -407,7 +398,7 @@ class _PersonEmbedder:
         return _fallback_histogram_embedding(crop)
 
 
-_ARM_ANCHOR_KEYPOINT_INDICES = (7, 8, 9, 10)  # 팔꿈치(좌/우) + 손목(좌/우)
+_ARM_ANCHOR_KEYPOINT_INDICES = (7, 8, 9, 10)  # COCO elbow/wrist keypoints.
 
 
 def _find_box_seat(
@@ -428,7 +419,7 @@ def _find_box_seat(
                 continue
             kx, ky = keypoints[idx]
             if kx <= 0 and ky <= 0:
-                continue  # 미검출 keypoint는 (0, 0)으로 나옴
+                continue
             arm_points.append((float(kx), float(ky)))
 
     best_seat, best_score = None, 0.0
@@ -439,7 +430,7 @@ def _find_box_seat(
             cv2.pointPolygonTest(polygon_points, pt, False) >= 0
             for pt in arm_points
         )
-        score = 1.0 if hip_inside else 0.6 if arm_inside else 0.0
+        score = 1.0 if hip_inside else 0.8 if arm_inside else 0.0
         if score > best_score:
             best_seat, best_score = seat_id, score
 
