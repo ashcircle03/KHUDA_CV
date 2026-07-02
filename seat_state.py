@@ -430,7 +430,7 @@ def _find_box_seat(
             cv2.pointPolygonTest(polygon_points, pt, False) >= 0
             for pt in arm_points
         )
-        score = 1.0 if hip_inside else 0.8 if arm_inside else 0.0
+        score = 1.0 if hip_inside else 0.6 if arm_inside else 0.0
         if score > best_score:
             best_seat, best_score = seat_id, score
 

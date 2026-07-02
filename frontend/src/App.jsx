@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const SNAPSHOT_REASON_META = {
+  SESSION_STARTED:   { label: "신규 등록",     tone: "gray" },
   IDENTITY_CANDIDATE:{ label: "임계 초과",     tone: "amber" },
   IDENTITY_CHANGE:   { label: "신원 변경 확정", tone: "red" },
 };
@@ -533,7 +534,8 @@ export function App() {
   const [policy,         setPolicy]         = useState({
     useLimitSeconds: 1800,
     awayThresholdSeconds: 600,
-    tableDiffIntervalSeconds: 10,
+    personDetectionIntervalSeconds: 5,
+    tableDiffIntervalSeconds: 5,
     tableChangeEnterThreshold: 0.18,
     tableChangeExitThreshold: 0.10,
   });

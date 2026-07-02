@@ -149,8 +149,8 @@ khuda_cv/
 | `nearLimitBeforeSeconds` | 600 | 제한 시간 10분 전부터 임박 알림 |
 | `awayThresholdSeconds` | 600 | 자리비움 10분 후 알림 |
 | `eventDebounceSeconds` | 10 | 설정값은 보존하지만 현재 중복 방지는 미확인 이벤트 기준 |
-| `personDetectionIntervalSeconds` | 10 | 사람 감지 주기 |
-| `tableDiffIntervalSeconds` | 10 | 테이블 ROI 변화 비교 주기 |
+| `personDetectionIntervalSeconds` | 5 | 사람 감지 주기 |
+| `tableDiffIntervalSeconds` | 5 | 테이블 ROI 변화 비교 주기 |
 | `tableChangeEnterThreshold` | 0.18 | 연결 구조 변화 점유 진입 기준 |
 | `tableChangeExitThreshold` | 0.10 | 연결 구조 변화 점유 해제 기준 |
 | `tableStaticThreshold` | 0.012 | 변화 점수 안정성 표시 기준 |
