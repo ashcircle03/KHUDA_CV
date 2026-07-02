@@ -114,7 +114,7 @@ khuda_cv/
 | 상태 | 조건 | 시간 처리 |
 |---|---|---|
 | `EMPTY` | 최근 person 감지가 없고 tablePolygon 변화도 사라짐 | 세션 종료 |
-| `SEATED` | 최근 person 감지의 hip/bottom anchor가 seatPolygon 안에 있음 | 누적 이용 시간 증가 |
+| `SEATED` | 최근 person 감지의 hip anchor 또는 팔꿈치/손목 keypoint가 seatPolygon 안에 있음 | 누적 이용 시간 증가 |
 | `AWAY` | person 감지는 없지만 tablePolygon 변화가 유지됨 | 누적 이용 시간과 자리비움 시간 증가 |
 
 세부 조건은 다음 순서로 적용된다.
@@ -122,7 +122,7 @@ khuda_cv/
 1. `table_change.py`가 `tablePolygon`만 baseline 대비 구조 변화 면적으로 비교한다.
 2. `tableChangeScore`는 조명 보정 grayscale 차이에서 연결된 변화 영역을 강화한 구조 변화 점수다.
 3. 구조 변화 점수가 `0.18` 이상이면 점유 변화로 진입하고, `0.10` 미만이면 해제한다.
-4. person 감지는 `personDetectionIntervalSeconds` 주기로 실행하고, person bbox의 hip anchor와 bottom anchor가 `seatPolygon` 안에 들어오는지 본다.
+4. person 감지는 `personDetectionIntervalSeconds` 주기로 실행하고, person bbox의 hip anchor를 우선 본 뒤 pose keypoint의 팔꿈치/손목을 보조 앵커로 `seatPolygon` 안에 들어오는지 확인한다.
 5. 마지막 person 감지가 `personDetectionIntervalSeconds * 2.5` 이내면 테이블 변화와 무관하게 `SEATED`로 본다.
 6. 최근 person 감지가 없고 tablePolygon 변화가 유지되면 `AWAY`로 전환하고 자리비움 타이머를 시작한다.
 7. 최근 person 감지도 없고 tablePolygon 변화도 baseline 수준으로 회복되면 `EMPTY`로 전환한다.
@@ -134,10 +134,10 @@ khuda_cv/
 | `NONE` | 정상 이용 중 |
 | `BELONGINGS_ONLY` | `AWAY`지만 자리비움 기준 시간 전 |
 | `AWAY_TOO_LONG` | `AWAY` 상태가 `awayThresholdSeconds` 이상 지속 |
-| `NEAR_LIMIT` | `SEATED` 누적 이용 시간이 제한 시간에 가까워짐 |
-| `OVERDUE` | `SEATED` 누적 이용 시간이 `useLimitSeconds` 이상 |
+| `NEAR_LIMIT` | 누적 이용 시간이 제한 시간에 가까워짐 |
+| `OVERDUE` | 누적 이용 시간이 `useLimitSeconds` 이상 |
 
-알림 우선순위는 상태별로 분리된다. `AWAY`는 `AWAY_TOO_LONG > BELONGINGS_ONLY`, `SEATED`는 `OVERDUE > NEAR_LIMIT > NONE`이다.
+알림 우선순위는 `OVERDUE > NEAR_LIMIT > AWAY_TOO_LONG > BELONGINGS_ONLY > NONE`이다.
 
 ## 운영 정책 기본값
 
@@ -154,7 +154,7 @@ khuda_cv/
 | `tableChangeEnterThreshold` | 0.18 | 연결 구조 변화 점유 진입 기준 |
 | `tableChangeExitThreshold` | 0.10 | 연결 구조 변화 점유 해제 기준 |
 | `tableStaticThreshold` | 0.012 | 변화 점수 안정성 표시 기준 |
-| `seatedPersonAnchorThreshold` | 0.8 | person hip anchor 우선 좌석 매칭 기준 |
+| `seatedPersonAnchorThreshold` | 0.8 | person hip/팔꿈치/손목 앵커 좌석 매칭 기준 |
 | `identityChangeDistance` | 0.35 | 임베딩 변화 후보 거리 기준 |
 | `identityChangeConfirmSamples` | 2 | 신원 변경 후보 확정 샘플 수 |
 | `embeddingWindowSize` | 5 | 임베딩 평균 창 크기 |

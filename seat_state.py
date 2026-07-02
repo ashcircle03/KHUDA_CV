@@ -278,15 +278,20 @@ class SeatStateEngine:
         accumulated: float,
         away_seconds: float,
     ) -> str:
+        """표시 우선순위: 시간초과 > 마감임박 > 장기간부재/자리비움 > 없음.
+
+        누적 이용시간은 SEATED·AWAY 모두 흐르므로, 자리비움 중이어도 이용시간
+        초과/임박 여부를 먼저 검사한다. 자리비움 관련 알림은 그 둘 다 아닐 때만 본다.
+        """
         settings = self._settings.snapshot()
-        if state.occupancy_state == "AWAY":
-            if away_seconds >= float(settings["awayThresholdSeconds"]):
-                return "AWAY_TOO_LONG"
-            return "BELONGINGS_ONLY"
         if accumulated >= float(settings["useLimitSeconds"]):
             return "OVERDUE"
         if accumulated >= float(settings["useLimitSeconds"]) - float(settings["nearLimitBeforeSeconds"]):
             return "NEAR_LIMIT"
+        if state.occupancy_state == "AWAY":
+            if away_seconds >= float(settings["awayThresholdSeconds"]):
+                return "AWAY_TOO_LONG"
+            return "BELONGINGS_ONLY"
         return "NONE"
 
     def _find_seated_people(
@@ -300,7 +305,7 @@ class SeatStateEngine:
         result: dict[str, tuple[Box, float]] = {}
         min_score = float(settings["seatedPersonAnchorThreshold"])
         for box in boxes:
-            seat_id, score = _find_box_seat(box.xyxy, polygons, min_score)
+            seat_id, score = _find_box_seat(box.xyxy, box.keypoints, polygons, min_score)
             if seat_id is None:
                 continue
             previous = result.get(seat_id)
@@ -393,8 +398,12 @@ class _PersonEmbedder:
         return _fallback_histogram_embedding(crop)
 
 
+_ARM_ANCHOR_KEYPOINT_INDICES = (7, 8, 9, 10)  # COCO elbow/wrist keypoints.
+
+
 def _find_box_seat(
     xyxy: np.ndarray,
+    keypoints: Optional[np.ndarray],
     polygons: dict[str, np.ndarray],
     min_score: float,
 ) -> tuple[Optional[str], float]:
@@ -402,18 +411,26 @@ def _find_box_seat(
     person_height = max(py2 - py1, 1.0)
     center_x = float((px1 + px2) / 2.0)
     hip_point = (center_x, float(py1 + person_height * 0.72))
-    bottom_center = (float((px1 + px2) / 2.0), float(py2))
+
+    arm_points: list[tuple[float, float]] = []
+    if keypoints is not None:
+        for idx in _ARM_ANCHOR_KEYPOINT_INDICES:
+            if idx >= len(keypoints):
+                continue
+            kx, ky = keypoints[idx]
+            if kx <= 0 and ky <= 0:
+                continue
+            arm_points.append((float(kx), float(ky)))
 
     best_seat, best_score = None, 0.0
     for seat_id, polygon in polygons.items():
         polygon_points = polygon.reshape(-1, 2).astype(np.float32)
         hip_inside = cv2.pointPolygonTest(polygon_points, hip_point, False) >= 0
-        foot_inside = cv2.pointPolygonTest(
-            polygon_points,
-            bottom_center,
-            False,
-        ) >= 0
-        score = 1.0 if hip_inside else 0.6 if foot_inside else 0.0
+        arm_inside = any(
+            cv2.pointPolygonTest(polygon_points, pt, False) >= 0
+            for pt in arm_points
+        )
+        score = 1.0 if hip_inside else 0.8 if arm_inside else 0.0
         if score > best_score:
             best_seat, best_score = seat_id, score
 

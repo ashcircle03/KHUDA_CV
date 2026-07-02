@@ -14,6 +14,7 @@ class Box:
     xyxy: np.ndarray  # [x1, y1, x2, y2]
     confidence: float
     cls_name: str = ""
+    keypoints: np.ndarray | None = None  # [17, 2] COCO pose keypoints when using a pose model.
 
 
 @dataclass
@@ -24,7 +25,7 @@ class DetectionResult:
 class Detector:
     def __init__(
         self,
-        model: str = "yolov8s.pt",
+        model: str = "yolov8s-pose.pt",
         person_conf: float = 0.25,
         imgsz: int = 448,
         **_: object,
@@ -46,13 +47,19 @@ class Detector:
         )
         persons: list[Box] = []
         for r in results:
-            for box in r.boxes:
+            # Pose 모델이면 좌석 매칭 보조용 keypoint를 함께 반환한다.
+            keypoints_xy = (
+                r.keypoints.xy.cpu().numpy() if r.keypoints is not None else None
+            )
+            for i, box in enumerate(r.boxes):
                 confidence = float(box.conf[0])
                 if confidence < self._person_conf:
                     continue
+                kpts = keypoints_xy[i] if keypoints_xy is not None else None
                 persons.append(Box(
                     xyxy=box.xyxy[0].cpu().numpy(),
                     confidence=confidence,
                     cls_name="person",
+                    keypoints=kpts,
                 ))
         return DetectionResult(person_boxes=persons)
